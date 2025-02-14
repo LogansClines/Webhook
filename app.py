@@ -5,12 +5,11 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# Get Discord Webhook URL from Render Environment Variables
 DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
 
 @app.route("/")
 def home():
-    return "Flask GitHub Webhook is running!", 200
+    return "PacketNodes GitHub Webhook is running!", 200
 
 @app.route("/github", methods=["POST"])
 def github_webhook():
@@ -18,14 +17,43 @@ def github_webhook():
 
     if "commits" in data:
         repo_name = data["repository"]["name"]
-        commit_messages = "\n".join([f"- {commit['message']} by {commit['author']['name']}" for commit in data["commits"]])
-        message = f"New commits pushed to **{repo_name}**:\n{commit_messages}"
+        repo_url = data["repository"]["html_url"]
+        pusher = data["pusher"]["name"]
+        avatar_url = data["sender"]["avatar_url"]
 
-        # Send message to Discord
-        requests.post(DISCORD_WEBHOOK, json={"content": message})
+        embed = {
+            "title": f"🚀 New Push to {repo_name}",
+            "url": repo_url,
+            "color": 0x57F287,
+            "fields": [],
+            "footer": {
+                "text": f"Powered by PacketNodes | Commit pushed by {pusher}",
+                "icon_url": avatar_url
+            },
+            "timestamp": data["repository"]["updated_at"],
+            "author": {
+                "name": "PacketNodes Webhook Service",
+                "icon_url": avatar_url
+            }
+        }
 
-    return "", 204  # Respond with no content (success)
+        for commit in data["commits"]:
+            commit_msg = commit["message"]
+            commit_author = commit["author"]["name"]
+            commit_url = commit["url"]
+
+            embed["fields"].append({
+                "name": f"📝 {commit_author}",
+                "value": f"[{commit_msg}]({commit_url})",
+                "inline": False
+            })
+
+        payload = {"embeds": [embed]}
+
+        requests.post(DISCORD_WEBHOOK, json=payload)
+
+    return "", 204
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))  # Render assigns a dynamic port
+    port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
