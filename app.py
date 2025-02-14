@@ -1,11 +1,16 @@
 import json
 import requests
+import os
 from flask import Flask, request
 
 app = Flask(__name__)
 
-# Replace with your Discord Webhook URL
-DISCORD_WEBHOOK = "YOUR_DISCORD_WEBHOOK_URL"
+# Get Discord Webhook URL from Render Environment Variables
+DISCORD_WEBHOOK = os.getenv("DISCORD_WEBHOOK")
+
+@app.route("/")
+def home():
+    return "Flask GitHub Webhook is running!", 200
 
 @app.route("/github", methods=["POST"])
 def github_webhook():
@@ -22,4 +27,5 @@ def github_webhook():
     return "", 204  # Respond with no content (success)
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    port = int(os.getenv("PORT", 10000))  # Render assigns a dynamic port
+    app.run(host="0.0.0.0", port=port)
