@@ -32,7 +32,7 @@ def github_webhook():
             },
             "timestamp": data["repository"]["updated_at"],
             "author": {
-                "name": "PacketNodes Webhook Service",
+                "name": "PacketNodes Github",
                 "icon_url": avatar_url
             }
         }
