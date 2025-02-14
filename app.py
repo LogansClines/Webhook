@@ -3,6 +3,7 @@ import requests
 import os
 import sys
 from flask import Flask, request
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -16,7 +17,7 @@ def home():
 def github_webhook():
     data = request.json
     event_type = request.headers.get("X-GitHub-Event")
-    
+
     print(f"GitHub Webhook Received: {json.dumps(data, indent=4)}", file=sys.stderr)
 
     if not data:
@@ -35,35 +36,26 @@ def github_webhook():
         embed["title"] = f"🚀 New Push to {repo_name}"
         embed["url"] = repo_url
         embed["color"] = 0x57F287
-        embed["fields"] = []
-        for commit in data["commits"]:
-            embed["fields"].append({
-                "name": f"📝 {commit['author']['name']}",
-                "value": f"[{commit['message']}]({commit['url']})",
-                "inline": False
-            })
+        embed["fields"] = [{"name": f"📝 {commit['author']['name']}", "value": f"[{commit['message']}]({commit['url']})", "inline": False} for commit in data["commits"]]
 
     else:
         return "Event not supported", 204
 
-    requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]})
+    send_discord_webhook(embed)
     return "", 204
 
 @app.route("/hetrixtools", methods=["POST"])
 def hetrixtools_webhook():
     data = request.json
-
     print(f"HetrixTools Webhook Received: {json.dumps(data, indent=4)}", file=sys.stderr)
 
-    if not data:
-        return "Invalid JSON", 400
-
-    if "monitor_name" not in data or "monitor_status" not in data:
+    if not data or "monitor_name" not in data or "monitor_status" not in data:
         print("Missing required fields", file=sys.stderr)
         return "Missing required fields", 400
 
     color = 0x2ECC71 if data["monitor_status"].lower() == "online" else 0xE74C3C
     status_emoji = "✅" if data["monitor_status"].lower() == "online" else "❌"
+    timestamp_iso = datetime.utcfromtimestamp(data["timestamp"]).isoformat() + "Z"
 
     embed = {
         "title": f"{status_emoji} {data['monitor_name']} is now {data['monitor_status'].upper()}",
@@ -74,28 +66,22 @@ def hetrixtools_webhook():
             {"name": "Target", "value": data["monitor_target"], "inline": False}
         ],
         "footer": {"text": "Powered by PacketNodes | HetrixTools Monitoring"},
-        "timestamp": str(data.get("timestamp", ""))
+        "timestamp": timestamp_iso
     }
 
     if data["monitor_status"].lower() == "offline" and "monitor_errors" in data:
         error_details = "\n".join([f"**{loc}**: {msg}" for loc, msg in data["monitor_errors"].items()])
         embed["fields"].append({"name": "Error Details", "value": error_details, "inline": False})
 
-    response = requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]})
-    print(f"Discord Response: {response.status_code} {response.text}", file=sys.stderr)
-
+    send_discord_webhook(embed)
     return "", 204
 
 @app.route("/hetrixtools/resource", methods=["POST"])
 def hetrixtools_resource_webhook():
     data = request.json
-
     print(f"HetrixTools Resource Webhook Received: {json.dumps(data, indent=4)}", file=sys.stderr)
 
-    if not data:
-        return "Invalid JSON", 400
-
-    if "ServerLabel" not in data or "AlertStatus" not in data:
+    if not data or "ServerLabel" not in data or "AlertStatus" not in data:
         print("Missing required fields", file=sys.stderr)
         return "Missing required fields", 400
 
@@ -115,10 +101,15 @@ def hetrixtools_resource_webhook():
         "footer": {"text": "Powered by PacketNodes | HetrixTools Resource Monitoring"}
     }
 
-    response = requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]})
-    print(f"Discord Response: {response.status_code} {response.text}", file=sys.stderr)
-
+    send_discord_webhook(embed)
     return "", 204
+
+def send_discord_webhook(embed):
+    payload = {"embeds": [embed]}
+    headers = {"Content-Type": "application/json"}
+
+    response = requests.post(DISCORD_WEBHOOK, json=payload, headers=headers)
+    print(f"Discord Response: {response.status_code} {response.text}", file=sys.stderr)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
