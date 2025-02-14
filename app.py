@@ -68,20 +68,25 @@ def github_webhook():
 def hetrixtools_webhook():
     data = request.json
 
-    if data.get("MonitorName") and data.get("MonitorStatus"):
-        color = 0x2ECC71 if data["MonitorStatus"].lower() == "up" else 0xE74C3C
-        status_emoji = "✅" if data["MonitorStatus"].lower() == "up" else "❌"
+    if data.get("monitor_name") and data.get("monitor_status"):
+        color = 0x2ECC71 if data["monitor_status"].lower() == "online" else 0xE74C3C
+        status_emoji = "✅" if data["monitor_status"].lower() == "online" else "❌"
 
         embed = {
-            "title": f"{status_emoji} {data['MonitorName']} is now {data['MonitorStatus'].upper()}",
+            "title": f"{status_emoji} {data['monitor_name']} is now {data['monitor_status'].upper()}",
             "color": color,
             "fields": [
-                {"name": "Monitor Type", "value": data.get("MonitorType", "Unknown"), "inline": True},
-                {"name": "Uptime", "value": f"{data.get('Uptime', 'N/A')}%", "inline": True}
+                {"name": "Monitor Type", "value": data.get("monitor_type", "Unknown"), "inline": True},
+                {"name": "Category", "value": data.get("monitor_category", "N/A"), "inline": True},
+                {"name": "Target", "value": data["monitor_target"], "inline": False}
             ],
             "footer": {"text": "Powered by PacketNodes | HetrixTools Monitoring"},
-            "timestamp": data.get("Timestamp", "")
+            "timestamp": str(data.get("timestamp", ""))
         }
+
+        if data["monitor_status"].lower() == "offline" and "monitor_errors" in data:
+            error_details = "\n".join([f"**{loc}**: {msg}" for loc, msg in data["monitor_errors"].items()])
+            embed["fields"].append({"name": "Error Details", "value": error_details, "inline": False})
 
         requests.post(DISCORD_WEBHOOK, json={"embeds": [embed]})
 
@@ -103,7 +108,7 @@ def hetrixtools_resource_webhook():
                 {"name": "RAM Usage", "value": f"{data.get('RAM', 'N/A')}%", "inline": True},
                 {"name": "Swap Usage", "value": f"{data.get('Swap', 'N/A')}%", "inline": True},
                 {"name": "Disk Usage", "value": f"{data.get('Disk', 'N/A')}%", "inline": True},
-                {"name": "Timestamp", "value": data.get("Timestamp", "N/A"), "inline": False}
+                {"name": "Timestamp", "value": str(data.get("Timestamp", "N/A")), "inline": False}
             ],
             "footer": {"text": "Powered by PacketNodes | HetrixTools Resource Monitoring"}
         }
